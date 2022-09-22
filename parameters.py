@@ -15,18 +15,18 @@ def get_params(argv='1'):
 
         # INPUT PATH
         # dataset_dir='DCASE2020_SELD_dataset/',  # Base folder containing the foa/mic and metadata folders
-        dataset_dir = '/scratch/asignal/partha/DCASE2022_SELD_dataset',
+        dataset_dir = '/ext3/data/DCASE2022_SELD_dataset',
 
         # OUTPUT PATHS
         # feat_label_dir='DCASE2020_SELD_dataset/feat_label_hnet/',  # Directory to dump extracted features and labels
-        feat_label_dir='/scratch/asignal/partha/DCASE2022_SELD_dataset/seld_feat_label',
+        feat_label_dir='/scratch/jtc440/DCASE2022_SELD_dataset/seld_feat_label',
  
         model_dir='models/',            # Dumps the trained models and training curves in this folder
         dcase_output_dir='results/',    # recording-wise results are dumped in this path.
 
         # DATASET LOADING PARAMETERS
         mode='dev',         # 'dev' - development or 'eval' - evaluation dataset
-        dataset='foa',       # 'foa' - ambisonic or 'mic' - microphone signals
+        dataset='foa',       # 'foa' - ambisonic or 'stereo' or 'mic' - microphone signals
 
         #FEATURE PARAMS
         fs=24000,
@@ -39,6 +39,11 @@ def get_params(argv='1'):
         fmin_doa_salsalite = 50,
         fmax_doa_salsalite = 2000,
         fmax_spectra_salsalite = 9000,
+
+        use_hear_embedding = False,
+        hear_module_name = 'hearbaseline.stereo.naive',
+        hear_model_path = "/ext3/code/hear-baseline/saved_models/naive_baseline.pt",
+        hear_model_options = {},
 
         # MODEL TYPE
         multi_accdoa=False,  # False - Single-ACCDOA or True - Multi-ACCDOA

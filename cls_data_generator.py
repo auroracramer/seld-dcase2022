@@ -28,7 +28,7 @@ class DataGenerator(object):
 
         self._filenames_list = list()
         self._nb_frames_file = 0     # Using a fixed number of frames in feat files. Updated in _get_label_filenames_sizes()
-        self._nb_mel_bins = self._feat_cls.get_nb_mel_bins()
+        self._nb_audio_feats = self._feat_cls.get_nb_audio_feats()
         self._nb_ch = None
         self._label_len = None  # total length of label - DOA + SED
         self._doa_len = None    # DOA label length
@@ -43,7 +43,7 @@ class DataGenerator(object):
             '\tDatagen_mode: {}, nb_files: {}, nb_classes:{}\n'
             '\tnb_frames_file: {}, feat_len: {}, nb_ch: {}, label_len:{}\n'.format(
                 'eval' if self._is_eval else 'dev', len(self._filenames_list),  self._nb_classes,
-                self._nb_frames_file, self._nb_mel_bins, self._nb_ch, self._label_len
+                self._nb_frames_file, self._nb_audio_feats, self._nb_ch, self._label_len
                 )
         )
 
@@ -61,7 +61,7 @@ class DataGenerator(object):
         )
 
     def get_data_sizes(self):
-        feat_shape = (self._batch_size, self._nb_ch, self._feature_seq_len, self._nb_mel_bins)
+        feat_shape = (self._batch_size, self._nb_ch, self._feature_seq_len, self._nb_audio_feats)
         if self._is_eval:
             label_shape = None
         else:
@@ -88,7 +88,7 @@ class DataGenerator(object):
   
         if len(temp_feat)!=0:
             self._nb_frames_file = max_frames if self._per_file else temp_feat.shape[0]
-            self._nb_ch = temp_feat.shape[1] // self._nb_mel_bins
+            self._nb_ch = temp_feat.shape[1] // self._nb_audio_feats
         else:
             print('Loading features failed')
             exit()
@@ -149,10 +149,10 @@ class DataGenerator(object):
                     file_cnt = file_cnt + 1
 
                 # Read one batch size from the circular buffer
-                feat = np.zeros((self._feature_batch_seq_len, self._nb_mel_bins * self._nb_ch))
+                feat = np.zeros((self._feature_batch_seq_len, self._nb_audio_feats * self._nb_ch))
                 for j in range(self._feature_batch_seq_len):
                     feat[j, :] = self._circ_buf_feat.popleft()
-                feat = np.reshape(feat, (self._feature_batch_seq_len, self._nb_ch, self._nb_mel_bins))
+                feat = np.reshape(feat, (self._feature_batch_seq_len, self._nb_ch, self._nb_audio_feats))
 
                 # Split to sequences
                 feat = self._split_in_seqs(feat, self._feature_seq_len)
@@ -200,10 +200,10 @@ class DataGenerator(object):
                     file_cnt = file_cnt + 1
 
                 # Read one batch size from the circular buffer
-                feat = np.zeros((self._feature_batch_seq_len, self._nb_mel_bins * self._nb_ch))
+                feat = np.zeros((self._feature_batch_seq_len, self._nb_audio_feats * self._nb_ch))
                 for j in range(self._feature_batch_seq_len):
                     feat[j, :] = self._circ_buf_feat.popleft()
-                feat = np.reshape(feat, (self._feature_batch_seq_len, self._nb_ch, self._nb_mel_bins))
+                feat = np.reshape(feat, (self._feature_batch_seq_len, self._nb_ch, self._nb_audio_feats))
 
                 if self._multi_accdoa is True:
                     label = np.zeros((self._label_batch_seq_len, self._num_track_dummy, self._num_axis, self._num_class))

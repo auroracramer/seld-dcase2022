@@ -15,6 +15,7 @@ import shutil
 import math
 import wave
 import contextlib
+from heareval.embeddings.task_embeddings import Embedding
 
 def nCr(n, r):
     return math.factorial(n) // math.factorial(r) // math.factorial(n-r)
@@ -58,16 +59,24 @@ class FeatureClass:
 
         self._dataset = params['dataset']
         self._eps = 1e-8
-        self._nb_channels = 4
+        if self._dataset in ('foa', 'mic'):
+            self._nb_channels = 4
+        elif self._dataset == 'stereo':
+            self._nb_channels = 2
 
         self._multi_accdoa = params['multi_accdoa']
         self._use_salsalite = params['use_salsalite']
+        self._use_hear_embedding = params['use_hear_embedding']
+
+        assert not (self._use_salsalite and self._use_hear_embedding), (
+            'Cannot use both SALSA Lite and HEAR embeddings'
+        )
+
         if self._use_salsalite and self._dataset=='mic':
             # Initialize the spatial feature constants
             self._lower_bin = np.int(np.floor(params['fmin_doa_salsalite'] * self._nfft / np.float(self._fs)))
             self._lower_bin = np.max((1, self._lower_bin))
             self._upper_bin = np.int(np.floor(np.min((params['fmax_doa_salsalite'], self._fs//2)) * self._nfft / np.float(self._fs)))
-
 
             # Normalization factor for salsalite
             c = 343
@@ -79,9 +88,27 @@ class FeatureClass:
             # Initialize spectral feature constants
             self._cutoff_bin = np.int(np.floor(params['fmax_spectra_salsalite'] * self._nfft / np.float(self._fs)))
             assert self._upper_bin <= self._cutoff_bin, 'Upper bin for doa featurei {} is higher than cutoff bin for spectrogram {}!'.format()
-            self._nb_mel_bins = self._cutoff_bin-self._lower_bin 
+            self._nb_audio_feats = self._nb_mel_bins = self._cutoff_bin-self._lower_bin 
+        elif self._use_hear_embedding and self._dataset == 'stereo':
+            self._hear_module_name = params['hear_module_name']
+            self._hear_model_path = params['hear_model_path']
+            self._hear_model_options = params['hear_model_options']
+            self._hear_embedding_model = Embedding(
+                self._hear_module_name,
+                self._hear_model_path,
+                self._hear_model_options,
+            )
+            if self._hear_embedding_model.sample_rate != self._fs:
+                raise ValueError(
+                    f"HEAR embedding '{self._hear_module_name}' expects sample "
+                    f"rate {self._hear_embedding_model.sample_rate}, which differs "
+                    f"from specified sample rate {self._fs}"
+                )
+            self._nb_audio_feats = self._hear_embedding_model.model.timestamp_embedding_size
+            self._nb_mel_bins = None
+            assert self._nb_channels == self._hear_embedding_model.num_channels
         else:
-            self._nb_mel_bins = params['nb_mel_bins']
+            self._nb_audio_feats = self._nb_mel_bins = params['nb_mel_bins']
             self._mel_wts = librosa.filters.mel(sr=self._fs, n_fft=self._nfft, n_mels=self._nb_mel_bins).T
         # Sound event classes dictionary
         self._nb_unique_classes = params['unique_classes']
@@ -125,6 +152,8 @@ class FeatureClass:
             stft_ch = librosa.core.stft(np.asfortranarray(audio_input[:, ch_cnt]), n_fft=self._nfft, hop_length=self._hop_len,
                                         win_length=self._win_len, window='hann')
             spectra.append(stft_ch[:, :_nb_frames])
+        # spectra.shape = (nb_ch, nb_freq, nb_frames)
+        # return array with shape = (nb_frames, nb_freq, nb_ch)
         return np.array(spectra).T
 
     def _get_mel_spectrogram(self, linear_spectra):
@@ -134,7 +163,9 @@ class FeatureClass:
             mel_spectra = np.dot(mag_spectra, self._mel_wts)
             log_mel_spectra = librosa.power_to_db(mel_spectra)
             mel_feat[:, :, ch_cnt] = log_mel_spectra
+        # ^^^ mel_feat.shape = (nb_frames, nb_freq, nb_ch)
         mel_feat = mel_feat.transpose((0, 2, 1)).reshape((linear_spectra.shape[0], -1))
+        # ^^^ mel_feat.shape = (nb_frames, nb_ch * nb_freq)
         return mel_feat
 
     def _get_foa_intensity_vectors(self, linear_spectra):
@@ -153,6 +184,7 @@ class FeatureClass:
     def _get_gcc(self, linear_spectra):
         gcc_channels = nCr(linear_spectra.shape[-1], 2)
         gcc_feat = np.zeros((linear_spectra.shape[0], self._nb_mel_bins, gcc_channels))
+        # ^^^ gcc_feat.shape = (nb_frames, nb_freq, nCr(nb_ch, 2) )
         cnt = 0
         for m in range(linear_spectra.shape[-1]):
             for n in range(m+1, linear_spectra.shape[-1]):
@@ -161,6 +193,7 @@ class FeatureClass:
                 cc = np.concatenate((cc[:, -self._nb_mel_bins//2:], cc[:, :self._nb_mel_bins//2]), axis=-1)
                 gcc_feat[:, :, cnt] = cc
                 cnt += 1
+        # return array with shape = ( nb_frames, nCr(nb_ch, 2), nb_freq ) -> ( nb_frames, nCr(nb_ch, 2) * nb_freq )
         return gcc_feat.transpose((0, 2, 1)).reshape((linear_spectra.shape[0], -1))
 
     def _get_salsalite(self, linear_spectra):
@@ -169,29 +202,61 @@ class FeatureClass:
         phase_vector = np.angle(linear_spectra[:, :, 1:] * np.conj(linear_spectra[:, :, 0, None]))
         phase_vector = phase_vector / (self._delta * self._freq_vector)
         phase_vector = phase_vector[:, self._lower_bin:self._cutoff_bin, :]
+        # ^^^ phase_vector.shape = (nb_frames, nb_freq, (n_ch - 1) )
         phase_vector[:, self._upper_bin:, :] = 0
         phase_vector = phase_vector.transpose((0, 2, 1)).reshape((phase_vector.shape[0], -1))
+        # ^^^ phase_vector.shape = (nb_frames, (n_ch - 1) * nb_freq )
 
         # spectral features
         linear_spectra = np.abs(linear_spectra)**2
+        # ^^^ linear_spectra.shape = (nb_frames, nb_freq, n_ch)
         for ch_cnt in range(linear_spectra.shape[-1]):
             linear_spectra[:, :, ch_cnt] = librosa.power_to_db(linear_spectra[:, :, ch_cnt], ref=1.0, amin=1e-10, top_db=None)
         linear_spectra = linear_spectra[:, self._lower_bin:self._cutoff_bin, :]
         linear_spectra = linear_spectra.transpose((0, 2, 1)).reshape((linear_spectra.shape[0], -1))
+        # ^^^ linear_spectra.shape = (nb_frames, n_ch * nb_freq)
         
         return np.concatenate((linear_spectra, phase_vector), axis=-1) 
 
-
-
     def _get_spectrogram_for_file(self, audio_filename):
         audio_in, fs = self._load_audio(audio_filename)
-         
+
         nb_feat_frames = int(len(audio_in) / float(self._hop_len))
         nb_label_frames = int(len(audio_in) / float(self._label_hop_len))
         self._filewise_frames[os.path.basename(audio_filename).split('.')[0]] = [nb_feat_frames, nb_label_frames]
 
         audio_spec = self._spectrogram(audio_in, nb_feat_frames)
         return audio_spec
+
+    def _hear_embedding(self, audio_input, _nb_frames):
+        # Reshape audio_in.shape = (1, nb_channels, nb_frames)
+        audio_input = np.expand_dims(audio_input.T, axis=0)
+        # audio_emb.shape = (nb_feat_frames, self._hear_embedding_model.model.timestamp_embedding_size)
+        audio_emb, ts  = self._hear_embedding_model.get_timestamp_embedding_as_numpy(audio_input)
+        # Get rid of dummy batch dimension
+        audio_emb, ts = audio_emb[0], ts[0]
+        # Make sure actual hop size matches
+        assert np.allclose((ts[1] - ts[0]) / 1000.0, self._hop_len_s)
+
+        # return array of shape = (nb_frames, n_emb)
+        return audio_emb[:_nb_frames, :]
+
+    def _get_hear_embedding_for_file(self, audio_filename):
+        # audio_in.shape = (nb_frames, nb_channels)
+        audio_in, fs = self._load_audio(audio_filename)
+        if fs != self._hear_embedding_model.sample_rate:
+            raise ValueError(
+                f"Expected audio ({audio_filename}) to have sample rate "
+                f"{self._hear_embedding_model.sample_rate}, but got {fs}"
+            )
+
+        # TODO: could separate this into another method for DRYness
+        nb_feat_frames = int(len(audio_in) / float(self._hop_len))
+        nb_label_frames = int(len(audio_in) / float(self._label_hop_len))
+        self._filewise_frames[os.path.basename(audio_filename).split('.')[0]] = [nb_feat_frames, nb_label_frames]
+
+        audio_emb = self._hear_embedding(audio_in, nb_feat_frames)
+        return audio_emb
 
     # OUTPUT LABELS
     def get_labels_for_file(self, _desc_file, _nb_label_frames):
@@ -330,32 +395,40 @@ class FeatureClass:
     # ------------------------------- EXTRACT FEATURE AND PREPROCESS IT -------------------------------
 
     def extract_file_feature(self, _arg_in):
-                _file_cnt, _wav_path, _feat_path = _arg_in
-                spect = self._get_spectrogram_for_file(_wav_path)
+        _file_cnt, _wav_path, _feat_path = _arg_in
+        if not self._use_hear_embedding:
+            spect = self._get_spectrogram_for_file(_wav_path)
 
-                #extract mel
-                if not self._use_salsalite:
-                    mel_spect = self._get_mel_spectrogram(spect)
+        #extract mel
+        if not self._use_salsalite:
+            mel_spect = self._get_mel_spectrogram(spect)
 
-                feat = None
-                if self._dataset == 'foa':
-                    # extract intensity vectors
-                    foa_iv = self._get_foa_intensity_vectors(spect)
-                    feat = np.concatenate((mel_spect, foa_iv), axis=-1)
-                elif self._dataset == 'mic':
-                    if self._use_salsalite:
-                        feat = self._get_salsalite(spect)
-                    else:
-                        # extract gcc
-                        gcc = self._get_gcc(spect)
-                        feat = np.concatenate((mel_spect, gcc), axis=-1)
-                else:
-                    print('ERROR: Unknown dataset format {}'.format(self._dataset))
-                    exit()
+        feat = None
+        if self._dataset == 'foa':
+            # extract intensity vectors
+            foa_iv = self._get_foa_intensity_vectors(spect)
+            feat = np.concatenate((mel_spect, foa_iv), axis=-1)
+        elif self._dataset == 'mic':
+            if self._use_salsalite:
+                feat = self._get_salsalite(spect)
+            else:
+                # extract gcc
+                gcc = self._get_gcc(spect)
+                feat = np.concatenate((mel_spect, gcc), axis=-1)
+        elif self._dataset == 'stereo':
+            if self._use_hear_embedding:
+                feat = self._get_hear_embeddings_for_file(_wav_path)
+            else:
+                # extract gcc
+                gcc = self._get_gcc(spect)
+                feat = np.concatenate((mel_spect, gcc), axis=-1)
+        else:
+            print('ERROR: Unknown dataset format {}'.format(self._dataset))
+            exit()
 
-                if feat is not None:
-                    print('{}: {}, {}'.format(_file_cnt, os.path.basename(_wav_path), feat.shape ))
-                    np.save(_feat_path, feat)
+        if feat is not None:
+            print('{}: {}, {}'.format(_file_cnt, os.path.basename(_wav_path), feat.shape ))
+            np.save(_feat_path, feat)
 
 
 
@@ -639,6 +712,9 @@ class FeatureClass:
 
     def get_nb_mel_bins(self):
         return self._nb_mel_bins
+
+    def get_nb_audio_feats(self):
+        return self._nb_audio_feats
 
 
 def create_folder(folder_name):
