@@ -672,16 +672,24 @@ class FeatureClass:
     # ------------------------------- Misc public functions -------------------------------
 
     def get_normalized_feat_dir(self):
-        return os.path.join(
-            self._feat_label_dir,
-            '{}_norm'.format('{}_salsa'.format(self._dataset_combination) if (self._dataset=='mic' and self._use_salsalite) else self._dataset_combination)
-        )
+        if (self._dataset=='mic' and self._use_salsalite):
+            desc = '{}_salsa'.format(self._dataset_combination) 
+        elif (self._dataset=='stereo' and self._use_hear_embedding):
+            desc = '{}_hear_{}'.format(self._dataset_combination, self._hear_module_name.replace('.', '-'))
+        else:
+            desc = self._dataset_combination
+
+        return os.path.join(self._feat_label_dir, '{}_norm'.format(desc))
 
     def get_unnormalized_feat_dir(self):
-        return os.path.join(
-            self._feat_label_dir,
-            '{}'.format('{}_salsa'.format(self._dataset_combination) if (self._dataset=='mic' and self._use_salsalite) else self._dataset_combination)
-        )
+        if (self._dataset=='mic' and self._use_salsalite):
+            desc = '{}_salsa'.format(self._dataset_combination) 
+        elif (self._dataset=='stereo' and self._use_hear_embedding):
+            desc = '{}_hear_{}'.format(self._dataset_combination, self._hear_module_name.replace('.', '-'))
+        else:
+            desc = self._dataset_combination
+
+        return os.path.join(self._feat_label_dir, '{}'.format(desc))
 
     def get_label_dir(self):
         if self._is_eval:
