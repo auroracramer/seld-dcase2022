@@ -81,12 +81,14 @@ def get_params(argv='1'):
         print("FOA + ACCDOA\n")
         params['quick_test'] = False
         params['dataset'] = 'foa'
+        params['use_hear_embedding'] = False
         params['multi_accdoa'] = False
 
     elif argv == '3':
         print("FOA + multi ACCDOA\n")
         params['quick_test'] = False
         params['dataset'] = 'foa'
+        params['use_hear_embedding'] = False
         params['multi_accdoa'] = True
 
     elif argv == '4':
@@ -94,6 +96,7 @@ def get_params(argv='1'):
         params['quick_test'] = False
         params['dataset'] = 'mic'
         params['use_salsalite'] = False
+        params['use_hear_embedding'] = False
         params['multi_accdoa'] = False
 
     elif argv == '5':
@@ -101,6 +104,7 @@ def get_params(argv='1'):
         params['quick_test'] = False
         params['dataset'] = 'mic'
         params['use_salsalite'] = True
+        params['use_hear_embedding'] = False
         params['multi_accdoa'] = False
 
     elif argv == '6':
@@ -108,6 +112,7 @@ def get_params(argv='1'):
         params['quick_test'] = False
         params['dataset'] = 'mic'
         params['use_salsalite'] = False
+        params['use_hear_embedding'] = False
         params['multi_accdoa'] = True
 
     elif argv == '7':
@@ -115,7 +120,26 @@ def get_params(argv='1'):
         params['quick_test'] = False
         params['dataset'] = 'mic'
         params['use_salsalite'] = True
+        params['use_hear_embedding'] = False
         params['multi_accdoa'] = True
+
+    elif argv == '8':
+        print("STEREO + HEAR (naive.stereo) + multi ACCDOA\n")
+        params['quick_test'] = False
+        params['dataset'] = 'stereo'
+        params['use_salsalite'] = False
+        params['use_hear_embedding'] = True
+        params['multi_accdoa'] = True
+
+    elif argv == '9':
+        print("STEREO + HEAR (naive.stereo) + multi ACCDOA (2021)\n")
+        params['quick_test'] = False
+        params['dataset'] = 'stereo'
+        params['use_salsalite'] = False
+        params['use_hear_embedding'] = True
+        params['multi_accdoa'] = True
+        params['dataset_dir'] = params['dataset_dir'].replace('2022', '2021')
+        params['feat_label_dir'] = params['feat_label_dir'].replace('2022', '2021')
 
     elif argv == '999':
         print("QUICK TEST MODE\n")
