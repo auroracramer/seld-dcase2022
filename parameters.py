@@ -131,6 +131,7 @@ def get_params(argv='1'):
         params['use_hear_embedding'] = True
         params['hear_module_name'] = 'hearbaseline.stereo.naive'
         params['multi_accdoa'] = True
+        params['hop_len_s'] = 0.05
         params['fs'] = 44100
 
 
@@ -144,6 +145,7 @@ def get_params(argv='1'):
         params['multi_accdoa'] = True
         params['dataset_dir'] = params['dataset_dir'].replace('2022', '2021')
         params['feat_label_dir'] = params['feat_label_dir'].replace('2022', '2021')
+        params['hop_len_s'] = 0.05
         params['fs'] = 44100
 
     elif argv == '10':
@@ -156,6 +158,7 @@ def get_params(argv='1'):
         params['multi_accdoa'] = True
         params['dataset_dir'] = params['dataset_dir'].replace('2022', '2021')
         params['feat_label_dir'] = params['feat_label_dir'].replace('2022', '2021')
+        params['hop_len_s'] = 0.05
         params['fs'] = 48000
 
     elif argv == '999':
