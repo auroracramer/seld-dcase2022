@@ -399,10 +399,9 @@ class FeatureClass:
         _file_cnt, _wav_path, _feat_path = _arg_in
         if not self._use_hear_embedding:
             spect = self._get_spectrogram_for_file(_wav_path)
-
-        #extract mel
-        if not self._use_salsalite:
-            mel_spect = self._get_mel_spectrogram(spect)
+            #extract mel
+            if not self._use_salsalite:
+                mel_spect = self._get_mel_spectrogram(spect)
 
         feat = None
         if self._dataset == 'foa':
