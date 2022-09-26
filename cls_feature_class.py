@@ -417,7 +417,7 @@ class FeatureClass:
                 feat = np.concatenate((mel_spect, gcc), axis=-1)
         elif self._dataset == 'stereo':
             if self._use_hear_embedding:
-                feat = self._get_hear_embeddings_for_file(_wav_path)
+                feat = self._get_hear_embedding_for_file(_wav_path)
             else:
                 # extract gcc
                 gcc = self._get_gcc(spect)
