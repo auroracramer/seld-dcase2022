@@ -129,7 +129,7 @@ def get_params(argv='1'):
         params['dataset'] = 'stereo'
         params['use_salsalite'] = False
         params['use_hear_embedding'] = True
-        params['hear_module_name'] = 'hearbaseline.stereo.naive',
+        params['hear_module_name'] = 'hearbaseline.stereo.naive'
         params['multi_accdoa'] = True
 
 
@@ -139,7 +139,7 @@ def get_params(argv='1'):
         params['dataset'] = 'stereo'
         params['use_salsalite'] = False
         params['use_hear_embedding'] = True
-        params['hear_module_name'] = 'hearbaseline.stereo.naive',
+        params['hear_module_name'] = 'hearbaseline.stereo.naive'
         params['multi_accdoa'] = True
         params['dataset_dir'] = params['dataset_dir'].replace('2022', '2021')
         params['feat_label_dir'] = params['feat_label_dir'].replace('2022', '2021')
@@ -150,7 +150,7 @@ def get_params(argv='1'):
         params['dataset'] = 'stereo'
         params['use_salsalite'] = False
         params['use_hear_embedding'] = True
-        params['hear_module_name'] = 'hearbaseline.stereo.torchopenl3',
+        params['hear_module_name'] = 'hearbaseline.stereo.torchopenl3'
         params['multi_accdoa'] = True
         params['dataset_dir'] = params['dataset_dir'].replace('2022', '2021')
         params['feat_label_dir'] = params['feat_label_dir'].replace('2022', '2021')
