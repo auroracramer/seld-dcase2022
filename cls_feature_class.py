@@ -30,12 +30,13 @@ class FeatureClass:
         """
 
         # Input directories
+        subset = 'eval' if is_eval else 'dev'
         self._feat_label_dir = params['feat_label_dir']
         self._dataset_dir = params['dataset_dir']
-        self._dataset_combination = '{}_{}'.format(params['dataset'], 'eval' if is_eval else 'dev')
+        self._dataset_combination = f"{params['dataset']}_{subset}"
         self._aud_dir = os.path.join(self._dataset_dir, self._dataset_combination)
 
-        self._desc_dir = None if is_eval else os.path.join(self._dataset_dir, 'metadata_dev')
+        self._desc_dir = None if is_eval else os.path.join(self._dataset_dir, f"metadata_{subset}")
 
         # Output directories
         self._label_dir = None

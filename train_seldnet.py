@@ -355,7 +355,7 @@ def main(argv):
 
         print('Loading unseen test dataset:')
         data_gen_test = cls_data_generator.DataGenerator(
-            params=params, split=test_splits[split_cnt], shuffle=False, per_file=True
+            params=params, split=test_splits[split_cnt], shuffle=False, per_file=True, is_eval=True if params['mode'] is 'eval' else False
         )
 
         # Dump results in DCASE output format for calculating final scores
